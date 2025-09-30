@@ -1,0 +1,25 @@
+# Core FastAPI dependencies
+fastapi==0.110.1
+uvicorn==0.25.0
+python-dotenv==1.1.1
+python-multipart==0.0.20
+
+# Database
+motor==3.3.1
+pymongo==4.5.0
+
+# CORS and middleware
+starlette==0.37.2
+
+# Image processing
+pillow==11.3.0
+
+# HTTP requests
+httpx==0.28.1
+requests==2.32.5
+
+# Data validation
+pydantic==2.11.9
+
+# Logging and utilities
+pathlib
