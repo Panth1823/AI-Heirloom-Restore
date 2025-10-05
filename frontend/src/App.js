@@ -16,9 +16,11 @@ const PhotoUploader = () => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [restorationId, setRestorationId] = useState(null);
-  const [status, setStatus] = useState('idle'); // idle, uploading, processing, completed, failed
+  const [status, setStatus] = useState('idle'); // idle, uploading, processing, completed, failed, api_key_required
   const [progress, setProgress] = useState(0);
   const [restoredImageUrl, setRestoredImageUrl] = useState(null);
+  const [apiKey, setApiKey] = useState('');
+  const [showApiKeyInput, setShowApiKeyInput] = useState(false);
   const { toast } = useToast();
 
   const handleFileSelect = useCallback((event) => {
@@ -51,6 +53,11 @@ const PhotoUploader = () => {
       
       const formData = new FormData();
       formData.append('file', selectedFile);
+      
+      // Add API key if provided
+      if (apiKey.trim()) {
+        formData.append('api_key', apiKey.trim());
+      }
 
       const response = await axios.post(`${API}/upload`, formData, {
         headers: {
@@ -73,12 +80,43 @@ const PhotoUploader = () => {
 
     } catch (error) {
       console.error('Upload failed:', error);
-      setStatus('failed');
-      toast({
-        title: "Upload Failed",
-        description: error.response?.data?.detail || "Failed to upload photo",
-        variant: "destructive",
-      });
+      
+      // Check for specific error types
+      if (error.response?.status === 429) {
+        // API quota exceeded
+        setStatus('api_key_required');
+        setShowApiKeyInput(true);
+        toast({
+          title: "API Quota Exceeded",
+          description: "Please add your own Gemini API key to continue",
+          variant: "destructive",
+        });
+      } else if (error.response?.status === 403) {
+        // Invalid API key
+        setStatus('api_key_required');
+        setShowApiKeyInput(true);
+        toast({
+          title: "Invalid API Key",
+          description: "Please check your API key and try again",
+          variant: "destructive",
+        });
+      } else if (error.response?.status === 400 && error.response?.data?.detail?.includes("No Google API key")) {
+        // No API key provided
+        setStatus('api_key_required');
+        setShowApiKeyInput(true);
+        toast({
+          title: "API Key Required",
+          description: "Please add your Gemini API key to continue",
+          variant: "destructive",
+        });
+      } else {
+        setStatus('failed');
+        toast({
+          title: "Upload Failed",
+          description: error.response?.data?.detail || "Failed to upload photo",
+          variant: "destructive",
+        });
+      }
     }
   };
 
@@ -124,6 +162,21 @@ const PhotoUploader = () => {
     }
   };
 
+  const handleApiKeySubmit = () => {
+    if (apiKey.trim()) {
+      setShowApiKeyInput(false);
+      setStatus('idle');
+      // Retry upload with the new API key
+      uploadAndRestore();
+    } else {
+      toast({
+        title: "API Key Required",
+        description: "Please enter a valid Gemini API key",
+        variant: "destructive",
+      });
+    }
+  };
+
   const reset = () => {
     setSelectedFile(null);
     setPreviewUrl(null);
@@ -131,6 +184,8 @@ const PhotoUploader = () => {
     setStatus('idle');
     setProgress(0);
     setRestoredImageUrl(null);
+    setApiKey('');
+    setShowApiKeyInput(false);
   };
 
   return (
@@ -178,6 +233,24 @@ const PhotoUploader = () => {
               </CardHeader>
               <CardContent>
                 <div className="flex flex-col items-center gap-6">
+                  {/* Optional API Key Input */}
+                  <div className="w-full">
+                    <label htmlFor="optional-api-key" className="block text-sm font-medium text-gray-700 mb-2">
+                      Gemini API Key (Optional - use your own key for unlimited usage)
+                    </label>
+                    <input
+                      type="password"
+                      id="optional-api-key"
+                      value={apiKey}
+                      onChange={(e) => setApiKey(e.target.value)}
+                      placeholder="Enter your Gemini API key (optional)..."
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent text-sm"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Get a free API key at: <a href="https://makersuite.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-amber-600 hover:underline">makersuite.google.com</a>
+                    </p>
+                  </div>
+
                   <input
                     type="file"
                     accept="image/*"
